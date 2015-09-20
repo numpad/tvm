@@ -11,6 +11,7 @@
 
 #define DEFAULT_FILE_EXTENSION ".ins"
 #define STACK_SIZE 32
+#define LABELS_SIZE 8
 #define PROGRAM_LINES 128
 #define PROGRAM_SIZE 256
 
@@ -29,7 +30,7 @@ void print_help(int argc, char *argv[]) {
 }
 
 enum {
-	OP_CODE, OP_VAL, OP_REG
+	OP_CODE, OP_VAL, OP_REG, OP_LBL
 } OP_TYPE;
 
 typedef struct {
@@ -54,6 +55,9 @@ OP op_val(int v) {
 OP op_reg(int v) {
 	return op_custom(OP_REG, v);
 }
+OP op_lbl(int v) {
+	return op_custom(OP_LBL, v);
+}
 
 int is_op_code(OP op) {
 	return op.type == OP_CODE;
@@ -64,25 +68,28 @@ int is_op_val(OP op) {
 int is_op_reg(OP op) {
 	return op.type == OP_REG;
 }
+int is_op_lbl(OP op) {
+	return op.type == OP_LBL;
+}
 
 
 const char *op_names[] = {
 	"PSH", "POP",
 	"ADD", "SUB", "MUL", "DIV", "RUT",
-	"PRT", "PRC", "STK", "RGS",
+	"PRT", "PRC", "STK", "RGS", "LBL",
 	"RDV",
-	"SET", "GET", "PUT", "SWP",
-	"RPT", "GTI",
-	"HLT", "HCF", "RET"
+	"SET", "GET", "PUT", "MOV", "SWP",
+	"RPT", "JMP", "JLZ", "JEZ", "JGZ",
+	"HLT", "HCF"
 };
 enum {
 	PSH, POP, 					/* Stack manipulation */
 	ADD, SUB, MUL, DIV,	RUT,	/* Maths */
-	PRT, PRC, STK, RGS,			/* Stdout */
+	PRT, PRC, STK, RGS, LBL,	/* Stdout */
 	RDV,						/* Stdin */
-	SET, GET, PUT, SWP,			/* Registers */
-	RPT, GTI,					/* Control Flow */
-	HLT, HCF, RET,				/* Quit */
+	SET, GET, PUT, MOV, SWP,	/* Registers */
+	RPT, JMP, JLZ, JEZ, JGZ,	/* Control Flow */
+	HLT, HCF,					/* Quit */
 	
 	OP_CODES_COUNT				
 } OP_CODES;
@@ -105,11 +112,11 @@ void print_ops() {
 	const int splits[] = {
 		POP,
 		RUT,
-		RGS,
+		LBL,
 		RDV,
 		SWP,
-		GTI,
-		RET
+		JGZ,
+		HCF
 	};
 	int split_idx = 0;
 
@@ -129,12 +136,14 @@ void print_ops() {
 const char *reg_names[] = {
 	"eax", "ebx", "ecx",
 	"swp",
-	"ip", "sp"
+	"ip", "sp",
+	"ext"
 };
 enum {
 	REG_EAX, REG_EBX, REG_ECX,		/* General purpose registers */
 	REG_SWP,						/* Swap register */
 	REG_IP, REG_SP,
+	REG_EXT,
 	REGISTER_COUNT
 } REGISTERS;
 int get_reg_by_name(const char *name) {
@@ -155,19 +164,23 @@ void print_regs() {
 }
 
 typedef struct {
-	int ip;
-	int sp;
+	char **labels;
+	int *label_idx;
 	int *stack;
 	int *reg;
 } PROGRAM;
 
 PROGRAM program_new(const int stack_size) {
-	return (PROGRAM) {
-		.ip = 0,
-		.sp = -1,
+	PROGRAM p = (PROGRAM) {
+		.labels = calloc(LABELS_SIZE, sizeof(char*)),
+		.label_idx = calloc(LABELS_SIZE, sizeof(int)),
 		.stack = malloc(stack_size * sizeof(int)),
 		.reg = calloc(REGISTER_COUNT, sizeof(int))
 	};
+	p.reg[REG_SP] = -1;
+	p.reg[REG_EXT] = 1;
+	
+	return p;
 }
 
 void program_delete(PROGRAM *p) {
@@ -175,24 +188,33 @@ void program_delete(PROGRAM *p) {
 	free(p->reg);
 }
 
+int get_lbl_by_name(const char *name, PROGRAM *prg) {
+	for (int i = 0; i < LABELS_SIZE; ++i) {
+		if (!strcmp(prg->labels[i], name)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 /*
  * Stack Manipulation
  */
 /* Push a new value on the stack */
 void stack_push(PROGRAM *prg, int val) {
-	prg->stack[++(prg->sp)] = val;
+	prg->stack[++(prg->reg[REG_SP])] = val;
 }
 /* Pop value of stack */
 int stack_pop(PROGRAM *prg) {
-	return prg->stack[(prg->sp)--];
+	return prg->stack[(prg->reg[REG_SP])--];
 }
 /* Return the top value of stack */
 int stack_top(PROGRAM *prg) {
-	return prg->stack[prg->sp];
+	return prg->stack[prg->reg[REG_SP]];
 }
 
 OP fetch(PROGRAM *prg, const OP program[]) {
-	return program[(prg->ip)++];
+	return program[(prg->reg[REG_IP])++];
 }
 
 int eval(PROGRAM *prg, const OP program[]) {
@@ -252,7 +274,7 @@ int eval(PROGRAM *prg, const OP program[]) {
 	case SET: {
 		const OP rg = fetch(prg, program);
 		if (!is_op_reg(rg)) {
-			printf("!! Instruction %d: Not a register type!\n", prg->ip);
+			printf("!! Instruction %d: Not a register type!\n", prg->reg[REG_IP]);
 			break;
 		}
 
@@ -260,10 +282,10 @@ int eval(PROGRAM *prg, const OP program[]) {
 		prg->reg[rg.val] = val.val;
 		break;
 	}
-	case PUT: {
+	case MOV: {
 		const OP rg = fetch(prg, program);
 		if (!is_op_reg(rg)) {
-			printf("!! Instruction %d: Not a register type!\n", prg->ip);
+			printf("!! Instruction %d: Not a register type!\n", prg->reg[REG_IP]);
 			break;
 		}
 		
@@ -271,10 +293,21 @@ int eval(PROGRAM *prg, const OP program[]) {
 		prg->reg[rg.val] = val;
 		break;
 	}
+	case PUT: {
+		const OP rg = fetch(prg, program);
+		if (!is_op_reg(rg)) {
+			printf("!! Instruction %d: Not a register type!\n", prg->reg[REG_IP]);
+			break;
+		}
+		
+		const int val = stack_top(prg);
+		prg->reg[rg.val] = val;
+		break;
+	}
 	case GET: {
 		const OP rg = fetch(prg, program);
 		if (!is_op_reg(rg)) {
-			printf("!! Instruction %d: Not a register type!\n", prg->ip);
+			printf("!! Instruction %d: Not a register type!\n", prg->reg[REG_IP]);
 			break;
 		}
 		stack_push(prg, prg->reg[rg.val]);
@@ -283,7 +316,7 @@ int eval(PROGRAM *prg, const OP program[]) {
 	case SWP: {
 		const OP rg = fetch(prg, program);
 		if (!is_op_reg(rg)) {
-			printf("!! Instruction %d: Not a register type!\n", prg->ip);
+			printf("!! Instruction %d: Not a register type!\n", prg->reg[REG_IP]);
 			break;
 		}
 		const int swp_val = prg->reg[REG_SWP];
@@ -293,11 +326,11 @@ int eval(PROGRAM *prg, const OP program[]) {
 		break;
 	}
 	case STK: {
-		if (prg->sp == -1) {
+		if (prg->reg[REG_SP] == -1) {
 			puts("[ ]");
 			break;
 		}
-		const int sz = prg->sp + 1;
+		const int sz = prg->reg[REG_SP] + 1;
 		printf("[ ");
 		for (int i = 0; i < sz; ++i) {
 			printf("%d ", prg->stack[i]);
@@ -311,6 +344,13 @@ int eval(PROGRAM *prg, const OP program[]) {
 		}
 		break;
 	}
+	case LBL: {
+		puts(" LABELS | PC ");
+		puts("--------+----");
+		for (int i = 0; i < LABELS_SIZE; ++i) {
+			printf(" %-.10s | %d\n", prg->labels[i], prg->label_idx[i]);
+		}
+	}
 	case RDV: {
 		int a;
 		printf("<- ");
@@ -319,45 +359,117 @@ int eval(PROGRAM *prg, const OP program[]) {
 		break;
 	}
 	case HCF: {
-		exit(2);
+		exit(1);
 	}
 	case RPT: {
-		prg->ip = 0;
-		break;
-	}
-	case GTI: {
-		const OP line = fetch(prg, program);
-		prg->ip = line.val;
+		prg->reg[REG_IP] = 0;
 		break;
 	}
 	case HLT: {
-		return -1;
+		return prg->reg[REG_EXT];
 	}
-	case RET: {
-		int ret = stack_pop(prg);
-		/* Return 0 means continue */
-		if (ret == 0)
-			ret = -1;
-		return ret;
+
+	case JMP: {
+		const OP lbl = fetch(prg, program);
+		const int lbl_pc = prg->label_idx[lbl.val];
+		prg->reg[REG_IP] = lbl_pc;
+		break;
+	}
+	case JGZ: {
+		const OP lbl = fetch(prg, program);
+		const int lbl_pc = prg->label_idx[lbl.val];
+		const int val = stack_top(prg);
+		if (val > 0)
+			prg->reg[REG_IP] = lbl_pc;
+		
+		break;
+	}
+	case JEZ: {
+		const OP lbl = fetch(prg, program);
+		const int lbl_pc = prg->label_idx[lbl.val];
+		const int val = stack_top(prg);
+		if (val == 0)
+			prg->reg[REG_IP] = lbl_pc;
+		
+		break;
+	}
+	case JLZ: {
+		const OP lbl = fetch(prg, program);
+		const int lbl_pc = prg->label_idx[lbl.val];
+		const int val = stack_top(prg);
+		if (val < 0)
+			prg->reg[REG_IP] = lbl_pc;
+		
+		break;
 	}
 	};
 
 	return 0;
 }
 
-OP *parse(char *prg[], const int lines) {
+OP *parse(PROGRAM *prog, char *prg[], const int lines) {
 	int pc = 0;
 	OP *program = malloc(sizeof(OP) * PROGRAM_SIZE);
+	int label_i = 0;
 
 #ifdef DEBUG
-	puts(" INSTRUCTION | REGISTER |  VALUE  ");
-	puts("-------------+----------+---------");
+	puts(" INSTRUCTION | REGISTER |  VALUE  | LABEL ");
+	puts("-------------+----------+---------+-------");
 #endif
+	/* Parse all labels */
+	for (int line = 0; line < lines; ++line) {
+		const int line_len = strlen(prg[line]);
+		
+		if (prg[line][0] == '.') {
+			prog->labels[label_i] = calloc(line_len, 1);
+			strcpy(prog->labels[label_i], prg[line] + 1);
+			
+			prog->label_idx[label_i] = pc;
+			++label_i;
+			continue;
+		}
+
+
+		int str_start = 0;
+		for (int i = 0; i < line_len; ++i) {
+			if (prg[line][i+1] == ' ' || i+1 == line_len) { 
+				/* This will be an instruction */
+				if (str_start == 0) {
+					str_start = i + 2;
+					++i;
+					++pc;
+					continue;
+				}
+				
+				/* Next will be a register maybe */
+				if (prg[line][str_start] == '@') {
+					++str_start;
+					str_start = i + 1;
+					++pc;
+					continue;
+				} else if (prg[line][str_start] == '.') {
+					/* or a label */
+					++str_start;
+					str_start = i + 1;
+					
+					++pc;
+					continue;
+				} else {
+					/* Last case, assume its a value */
+					++pc;
+				}
+				
+			}
+		}
+	}
+	
+	pc = 0;
 	for (int line = 0; line < lines; ++line) {
 		const int line_len = strlen(prg[line]);
 		
 		char instruction[8] = {0};
 		char register_id[8] = {0};
+		char label_id[16] = {0};
 		char const_value[24] = {0};
 
 		int str_start = 0;
@@ -381,6 +493,14 @@ OP *parse(char *prg[], const int lines) {
 					
 					program[pc++] = op_reg(get_reg_by_name(register_id));
 					continue;
+				} else if (prg[line][str_start] == '.') {
+					/* or a label */
+					++str_start;
+					strncpy(label_id, prg[line] + str_start, i - str_start + 1);
+					str_start = i + 1;
+					
+					program[pc++] = op_lbl(get_lbl_by_name(label_id, prog));
+					continue;
 				} else {
 					/* Last case, assume its a value */
 					strncpy(const_value, prg[line] + str_start, i - str_start + 1);
@@ -390,7 +510,7 @@ OP *parse(char *prg[], const int lines) {
 			}
 		}
 #ifdef DEBUG
-		printf(" %11s |   %-6s | %7s\n", instruction, register_id, const_value);
+		printf(" %11s |   %-6s | %7s | %s\n", instruction, register_id, const_value, label_id);
 #endif
 
 	}
@@ -409,12 +529,12 @@ void read_program_stdin(char *sprg[], int *sprg_len) {
 }
 
 int eval_line(PROGRAM *prg, char *line) {
-	prg->ip = 0;
+	prg->reg[REG_IP] = 0;
 	char *sprg[1];
 	sprg[0] = line;
 	int sprg_len = 1;
 	
-	OP *program = parse(sprg, sprg_len);
+	OP *program = parse(prg, sprg, sprg_len);
 	return eval(prg, program);
 }
 
@@ -517,7 +637,7 @@ int main(int argc, char *argv[]) {
 	/* Parse the program */
 	OP *instructions;
 	if (!repl)
-		instructions = parse(sprg, sprg_len);
+		instructions = parse(&program, sprg, sprg_len);
 	
 	int ret;
 	do {
@@ -532,7 +652,7 @@ int main(int argc, char *argv[]) {
 		}
 	} while (ret == 0);
 	
-	printf("=> Finished with code %d after %d instructions!\n", ret, program.ip);
+	printf("=> Finished with code %d.\n", ret);
 	
 	return 0;
 }

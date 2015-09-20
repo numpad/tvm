@@ -1,0 +1,11 @@
+SET @eax 10
+.countdown
+PSH 1
+GET @eax
+SUB
+PRT
+PUT @eax
+JEZ .end
+JMP .countdown
+.end
+HLT
