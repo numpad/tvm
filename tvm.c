@@ -22,7 +22,6 @@ void print_help(int argc, char *argv[]) {
 	printf("  -h             Show help message\n");
 	printf("  -v             Show local version\n");
 	printf("  -repl          Enter REPL\n");
-	printf("  -docs          Show Documentation\n");
 	printf("  -ops           List all instructions\n");
 	printf("  -regs          List all available registers\n");
 	printf("  -stack         Show maximal stack size\n");
@@ -129,12 +128,13 @@ void print_ops() {
 /* Registers */
 const char *reg_names[] = {
 	"eax", "ebx", "ecx",
-	"swp"
+	"swp",
+	"ip", "sp"
 };
 enum {
 	REG_EAX, REG_EBX, REG_ECX,		/* General purpose registers */
 	REG_SWP,						/* Swap register */
-	
+	REG_IP, REG_SP,
 	REGISTER_COUNT
 } REGISTERS;
 int get_reg_by_name(const char *name) {
@@ -399,11 +399,10 @@ OP *parse(char *prg[], const int lines) {
 }
 
 void read_program_stdin(char *sprg[], int *sprg_len) {
-	
 	for (*sprg_len = 0; *sprg_len < PROGRAM_LINES; ++*sprg_len) {
 		sprg[*sprg_len] = readline("| ");
 		if (strlen(sprg[*sprg_len]) == 0) {
-			printf("\e[1A\e[2D| Done\n\n");
+			//printf("\e[1A\e[2D| Done\n\n");
 			break;
 		}
 	}
@@ -456,20 +455,6 @@ int main(int argc, char *argv[]) {
 	char *sprg[PROGRAM_LINES];
 	int sprg_len;
 	
-	/*
-	if (argc == 1)
-		read_program_stdin(sprg, &sprg_len);
-	} else if (!strcmp(argv[1], "-stack")) {
-		if (argc == 2) {
-			printf("tvm maximal stack size: %d x 4 bytes\n", STACK_SIZE);
-			return 0;
-		} else {
-			program_delete(&program);
-			program = program_new(atoi(argv[2]) * sizeof(int));
-		}
-	} else read_program_file(argv[1], sprg, &sprg_len);
-	
-	*/
 	/* Store information for program */
 	PROGRAM program = program_new(STACK_SIZE);
 	/* Use repl instead of stdin/file */
