@@ -2,17 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <readline/readline.h>
 
-/*
- * TODO
- * - Add Labels
- * - Add Control flow instructions
- * - struct for stack values
- * - DOCUMENTATION
- * - Struct holding ip, sp, stack, reg
- * + Add swap register + instruction
- */
+#include <readline/readline.h>
+#include <readline/history.h>
 
 //#define DEBUG
 #define PROGRAM_VERSION "0.1"
@@ -544,19 +536,19 @@ int main(int argc, char *argv[]) {
 	
 	int ret;
 	do {
-		if (repl)
-			ret = eval_line(&program, readline("<- "));
-		else
+		if (repl) {
+			char *input = readline("<- ");
+			if (strlen(input) > 0) {
+				ret = eval_line(&program, input);
+				add_history(input);
+			}
+		} else {
 			ret = eval(&program, instructions);
+		}
 	} while (ret == 0);
 	
-	/* Free memory taken by raw program */
-	for (int i = 0; i < sprg_len; ++i) {
-		free(sprg[i]);
-	}
-
 	printf("=> Finished with code %d after %d instructions!\n", ret, program.ip);
-		
+	
 	return 0;
 }
 
