@@ -7,7 +7,7 @@
 #include <readline/history.h>
 
 //#define DEBUG
-#define PROGRAM_VERSION "0.1"
+#define PROGRAM_VERSION "0.1.1"
 
 #define DEFAULT_FILE_EXTENSION ".ins"
 #define STACK_SIZE 32
