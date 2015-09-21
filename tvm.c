@@ -76,6 +76,9 @@ int is_op_lbl(OP op) {
 const char *op_names[] = {
 	"PSH", "POP",
 	"ADD", "SUB", "MUL", "DIV", "RUT",
+	"AND", "OR", "XOR", "NOT",
+	"INC", "DEC", "INCR", "DECR",
+	"MIN", "MAX", "CMP",
 	"PRT", "PRC", "STK", "RGS", "LBL",
 	"RDV",
 	"SET", "GET", "PUT", "MOV", "SWP",
@@ -85,6 +88,9 @@ const char *op_names[] = {
 enum {
 	PSH, POP, 					/* Stack manipulation */
 	ADD, SUB, MUL, DIV,	RUT,	/* Maths */
+	AND, OR, XOR, NOT,			/* Bitwise */
+	INC, DEC, INCR, DECR,		/* +/- 1 shortcuts */
+	MIN, MAX, CMP,				/* Comparision */
 	PRT, PRC, STK, RGS, LBL,	/* Stdout */
 	RDV,						/* Stdin */
 	SET, GET, PUT, MOV, SWP,	/* Registers */
@@ -112,6 +118,9 @@ void print_ops() {
 	const int splits[] = {
 		POP,
 		RUT,
+		NOT,
+		DECR,
+		CMP,
 		LBL,
 		RDV,
 		SWP,
@@ -260,6 +269,57 @@ int eval(PROGRAM *prg, const OP program[]) {
 	case RUT: {
 		const int a = stack_pop(prg);
 		stack_push(prg, (int)sqrt(a));
+		break;
+	}
+	case MIN: {
+		const int a = stack_pop(prg);
+		const int b = stack_pop(prg);
+		stack_push(prg, (a < b) ? a : b);
+		break;
+	}
+	case MAX: {
+		const int a = stack_pop(prg);
+		const int b = stack_pop(prg);
+		stack_push(prg, (a > b) ? a : b);
+		break;
+	}
+	case CMP: {
+		const int a = stack_pop(prg);
+		const int b = stack_pop(prg);
+		stack_push(prg, b);
+		stack_push(prg, a);
+		
+		int val = 0;
+		if (a > b)
+			val = 1;
+		else if (a < b)
+			val = -1;
+
+		stack_push(prg, val);
+		break;
+	}
+	case AND: {
+		const int a = stack_pop(prg);
+		const int b = stack_pop(prg);
+		stack_push(prg, a & b);
+		break;
+	}
+	case OR: {
+		const int a = stack_pop(prg);
+		const int b = stack_pop(prg);
+		stack_push(prg, a | b);
+		break;
+	}
+	case XOR: {
+		const int a = stack_pop(prg);
+		const int b = stack_pop(prg);
+		stack_push(prg, a ^ b);
+		break;
+	}
+	case NOT: {
+		const int a = stack_pop(prg);
+		stack_push(prg, ~a);
+		break;
 	}
 	case PRT: {
 		const int val = stack_top(prg);
@@ -269,6 +329,26 @@ int eval(PROGRAM *prg, const OP program[]) {
 	case PRC: {
 		const int val = stack_pop(prg);
 		printf("%c", (char)val);
+		break;
+	}
+	case INC: {
+		const int val = stack_pop(prg);
+		stack_push(prg, val + 1);
+		break;
+	}
+	case DEC: {
+		const int val = stack_pop(prg);
+		stack_push(prg, val - 1);
+		break;
+	}
+	case INCR: {
+		const OP rg = fetch(prg, program);
+		prg->reg[rg.val] += 1;
+		break;
+	}
+	case DECR: {
+		const OP rg = fetch(prg, program);
+		prg->reg[rg.val] -= 1;
 		break;
 	}
 	case SET: {
