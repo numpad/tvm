@@ -66,6 +66,7 @@ To use the API:
 -regs		**List all available registers**  
 -stack		**Show maximal stack size**  
 -stack *n*	**Set maximal stack size**  
+-str *str*  **ASCII codes for *str***
 
 ## AUTHOR
 Christian Schäl

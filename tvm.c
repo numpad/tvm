@@ -9,11 +9,13 @@
 //#define DEBUG
 #define PROGRAM_VERSION "0.1.1"
 
+#define PRT_LOOK " "
+#define RDV_LOOK " "
 #define DEFAULT_FILE_EXTENSION ".ins"
 #define STACK_SIZE 32
-#define LABELS_SIZE 8
-#define PROGRAM_LINES 128
-#define PROGRAM_SIZE 256
+#define LABELS_SIZE 16
+#define PROGRAM_LINES 256
+#define PROGRAM_SIZE 512
 
 void print_help(int argc, char *argv[]) {
 	printf("tvm version %s - Tiny Virtual Machine - Copyright (C) 2015 Christian Schäl\n", PROGRAM_VERSION);
@@ -27,6 +29,7 @@ void print_help(int argc, char *argv[]) {
 	printf("  -regs          List all available registers\n");
 	printf("  -stack         Show maximal stack size\n");
 	printf("  -stack [int]   Set maximal stack size\n");
+	printf("  -str [str]     Prints 'str' as ASCII codes\n");
 }
 
 enum {
@@ -74,6 +77,7 @@ int is_op_lbl(OP op) {
 
 
 const char *op_names[] = {
+	"NOP",
 	"PSH", "POP",
 	"ADD", "SUB", "MUL", "DIV", "RUT",
 	"AND", "OR", "XOR", "NOT",
@@ -86,6 +90,7 @@ const char *op_names[] = {
 	"HLT", "HCF"
 };
 enum {
+	NOP,
 	PSH, POP, 					/* Stack manipulation */
 	ADD, SUB, MUL, DIV,	RUT,	/* Maths */
 	AND, OR, XOR, NOT,			/* Bitwise */
@@ -105,7 +110,7 @@ int get_op_code_by_name(const char *name) {
 		if (!strcmp(name, op_names[i]))
 			return i;
 	}
-	return -1;
+	return NOP;
 }
 
 void print_ops() {
@@ -116,6 +121,7 @@ void print_ops() {
 	 *         HLT, HCF & RET -> Exit Instructions
 	 */
 	const int splits[] = {
+		NOP,
 		POP,
 		RUT,
 		NOT,
@@ -229,8 +235,12 @@ OP fetch(PROGRAM *prg, const OP program[]) {
 int eval(PROGRAM *prg, const OP program[]) {
 	const OP instruction = fetch(prg, program);
 	
-	if (instruction.type != OP_CODE)
-		return 0;
+	switch (instruction.type) {
+		case OP_CODE:
+			break;
+		default:
+			return 0;
+	};
 	
 	switch (instruction.val) {
 	case PSH: {
@@ -323,7 +333,8 @@ int eval(PROGRAM *prg, const OP program[]) {
 	}
 	case PRT: {
 		const int val = stack_top(prg);
-		printf("-> %d\n", val);
+		printf(PRT_LOOK);
+		printf("%d\n", val);
 		break;
 	}
 	case PRC: {
@@ -433,7 +444,7 @@ int eval(PROGRAM *prg, const OP program[]) {
 	}
 	case RDV: {
 		int a;
-		printf("<- ");
+		printf(RDV_LOOK);
 		scanf("%d", &a);
 		stack_push(prg, a);
 		break;
@@ -483,7 +494,7 @@ int eval(PROGRAM *prg, const OP program[]) {
 		break;
 	}
 	};
-
+	
 	return 0;
 }
 
@@ -561,7 +572,9 @@ OP *parse(PROGRAM *prog, char *prg[], const int lines) {
 					str_start = i + 2;
 					i += 1;
 					
-					program[pc++] = op_code(get_op_code_by_name(instruction));
+					const int opcode = get_op_code_by_name(instruction);
+					program[pc++] = op_code(opcode);
+					
 					continue;
 				}
 				
@@ -679,7 +692,13 @@ int main(int argc, char *argv[]) {
 			printf("tvm version %s\n", PROGRAM_VERSION);
 			return 0;
 		}
-		
+		if (!strcmp(argv[i], "-str") && i + 1 < argc) {
+			for (int j = strlen(argv[i+1]) - 1; j >= 0; --j) {
+				printf("PSH %d\n", argv[i+1][j]);
+			}
+			printf("\n");
+			return 0;
+		}
 		if (!strcmp(argv[i], "-stack")) {
 			arg_stack_idx = i;
 			
