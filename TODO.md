@@ -7,4 +7,6 @@
 - [ ] Add more control flow instructions (but not too much)
 - [X] Add bitwise,~~max~~, ~~min~~, inc reg, dec reg, inc, dec, ~~cmp~~, ... operations
 - [ ] struct for stack values
+- [ ] Add function calls
+- [ ] 
 - [ ] DOCUMENTATION

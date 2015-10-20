@@ -11,6 +11,10 @@ TODO
 ## Instructions
 **Note:** **tvm** uses an optimistic stack system, that means there is **no guarantee** that the stack won't over-/underflow!
 
+### Ungrouped Instructions
+`NOP`
+Does completely nothing
+
 ### Stack Instructions
 `PSH <n>`  
 Push *n* on the stack

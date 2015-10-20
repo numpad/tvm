@@ -3,11 +3,31 @@
 #include <string.h>
 #include <math.h>
 
+/* Uncomment the following line if you want to support windows/distros without gnu/readline */
+//#define NO_READLINE
+
+#ifdef NO_READLINE
+/* gnu/readline not available? no problem! */
+
+void add_history(const char *str) {
+	/* dummy */
+}
+char *readline(const char *prt) {
+	printf("%s", prt);
+	char *buf = malloc(256);
+	fgets(buf, 256, stdin);
+	buf[strlen(buf) - 1] = 0;
+	return buf;
+}
+#else
+
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#endif
+
 //#define DEBUG
-#define PROGRAM_VERSION "0.1.1"
+#define PROGRAM_VERSION "0.1.2"
 
 #define PRT_LOOK " "
 #define RDV_LOOK " "
