@@ -16,7 +16,7 @@ tvm - Tiny C Virtual Machine
 ## SYNOPSIS
 usage: tvm [options] [infile]
 
-## DESCRPITION
+## DESCRIPTION
 tvm is a configurable, small virtual machine with support for different input methods, registers, a good range of instructions and a nice API.
 
 Here are some examples how to use tvm:
