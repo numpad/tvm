@@ -18,6 +18,7 @@ Does completely nothing
 ### Stack Instructions
 `PSH <n>`  
 Push *n* on the stack
+
 `POP`
 Pop a value from the stack
 
@@ -41,6 +42,9 @@ Pop a value from the stack
 *POP*s a value from the stack and *PSH*es it's square root.
 **NOTE:** tvm currently only supports Integral types so the result will be *very* inaccurate
 
+`MOD [ ... b a ]`  
+*POP*s two values from the stack and *PSH*es the result of a modulo operatiom.
+**NOTE:** the result will be `a % b`
 
 ### Bitwise Operations
 `AND [ ... b a ]`  
@@ -139,6 +143,8 @@ Set `pc` to position of *LBL* if `a == 0`.
 `JGZ [ ... a ]`  
 Set `pc` to position of *LBL* if `a > 0`.
 
+`JNZ [ ... a ]`  
+Set `pc` to position of *LBL* if `a != 0`.
 
 ### Exit
 `HLT`  

@@ -1,0 +1,26 @@
+RDV
+MOV @eax
+RDV
+MOV @ebx
+
+PSH 0
+
+.loop
+POP
+
+GET @ebx
+GET @eax
+MOD
+
+GET @ebx
+MOV @eax
+
+PUT @ebx
+JNZ .loop
+POP
+
+GET @eax
+MOV @ext
+
+HLT
+

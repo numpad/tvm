@@ -99,28 +99,28 @@ int is_op_lbl(OP op) {
 const char *op_names[] = {
 	"NOP",
 	"PSH", "POP",
-	"ADD", "SUB", "MUL", "DIV", "RUT",
+	"ADD", "SUB", "MUL", "DIV", "RUT", "MOD",
 	"AND", "OR", "XOR", "NOT",
 	"INC", "DEC", "INCR", "DECR",
 	"MIN", "MAX", "CMP",
 	"PRT", "PRC", "STK", "RGS", "LBL",
 	"RDV",
 	"SET", "GET", "PUT", "MOV", "SWP",
-	"RPT", "JMP", "JLZ", "JEZ", "JGZ",
+	"RPT", "JMP", "JLZ", "JEZ", "JGZ", "JNZ",
 	"HLT", "HCF"
 };
 enum {
 	NOP,
-	PSH, POP, 					/* Stack manipulation */
-	ADD, SUB, MUL, DIV,	RUT,	/* Maths */
-	AND, OR, XOR, NOT,			/* Bitwise */
-	INC, DEC, INCR, DECR,		/* +/- 1 shortcuts */
-	MIN, MAX, CMP,				/* Comparision */
-	PRT, PRC, STK, RGS, LBL,	/* Stdout */
-	RDV,						/* Stdin */
-	SET, GET, PUT, MOV, SWP,	/* Registers */
-	RPT, JMP, JLZ, JEZ, JGZ,	/* Control Flow */
-	HLT, HCF,					/* Quit */
+	PSH, POP, 						/* Stack manipulation */
+	ADD, SUB, MUL, DIV,	RUT, MOD,	/* Maths */
+	AND, OR, XOR, NOT,				/* Bitwise */
+	INC, DEC, INCR, DECR,			/* +/- 1 shortcuts */
+	MIN, MAX, CMP,					/* Comparision */
+	PRT, PRC, STK, RGS, LBL,		/* Stdout */
+	RDV,							/* Stdin */
+	SET, GET, PUT, MOV, SWP,		/* Registers */
+	RPT, JMP, JLZ, JEZ, JGZ, JNZ,	/* Control Flow */
+	HLT, HCF,						/* Quit */
 	
 	OP_CODES_COUNT				
 } OP_CODES;
@@ -143,14 +143,14 @@ void print_ops() {
 	const int splits[] = {
 		NOP,
 		POP,
-		RUT,
+		MOD,
 		NOT,
 		DECR,
 		CMP,
 		LBL,
 		RDV,
 		SWP,
-		JGZ,
+		JNZ,
 		HCF
 	};
 	int split_idx = 0;
@@ -290,7 +290,6 @@ int eval(PROGRAM *prg, const OP program[]) {
 		break;
 	}
 	case DIV: {
-		/* TODO: Add values like INF etc */
 		const int a = stack_pop(prg);
 		const int b = stack_pop(prg);
 		stack_push(prg, a / b);
@@ -299,6 +298,12 @@ int eval(PROGRAM *prg, const OP program[]) {
 	case RUT: {
 		const int a = stack_pop(prg);
 		stack_push(prg, (int)sqrt(a));
+		break;
+	}
+	case MOD: {
+		const int a = stack_pop(prg);
+		const int b = stack_pop(prg);
+		stack_push(prg, a % b);
 		break;
 	}
 	case MIN: {
@@ -509,6 +514,15 @@ int eval(PROGRAM *prg, const OP program[]) {
 		const int lbl_pc = prg->label_idx[lbl.val];
 		const int val = stack_top(prg);
 		if (val < 0)
+			prg->reg[REG_IP] = lbl_pc;
+		
+		break;
+	}
+	case JNZ: {
+		const OP lbl = fetch(prg, program);
+		const int lbl_pc = prg->label_idx[lbl.val];
+		const int val = stack_top(prg);
+		if (val != 0)
 			prg->reg[REG_IP] = lbl_pc;
 		
 		break;
